@@ -1,0 +1,7 @@
+node_modules/
+result.json
+*.log
+*.csv
+.env
+dist/
+deploy.sh
