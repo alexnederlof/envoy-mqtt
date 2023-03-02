@@ -1,4 +1,5 @@
 import axios, { AxiosInstance } from "axios";
+import { config } from "dotenv";
 import * as https from "https";
 import { Client as MqttClient } from "mqtt";
 import { AppConfig } from "./Config";
@@ -32,6 +33,12 @@ export class Bridge {
         rejectUnauthorized: false,
       }),
     });
+
+    const parsedTokenBody = JSON.parse(
+      Buffer.from(config.envoy.token.split(".")[1], "base64").toString()
+    );
+    const expire = new Date(parsedTokenBody.exp * 1000);
+    console.log("Token will expire at ", expire);
   }
 
   public async start() {
@@ -39,7 +46,7 @@ export class Bridge {
     this.toClear = setInterval(() => this.getLatest(), 60_000);
   }
   public async stop() {
-    if (this.toClear) {
+    if (this.toClear != null) {
       clearInterval(this.toClear);
     }
     console.log("Shutting down mqtt");
@@ -65,7 +72,7 @@ export class Bridge {
         "/production.json?details=1"
       );
       let { activeCount, readingTime, wNow, whLifetime } = data.production[0];
-      const lastReadDate = new Date(this.lastReadingTime * 1000);
+      const lastReadDate = new Date(readingTime * 1000);
       if (this.lastReadingTime === readingTime) {
         console.log("No update from envoy");
         return;
@@ -79,6 +86,9 @@ export class Bridge {
       await this.publish(prefix + "watt_now", wNow.toString());
       await this.publish(prefix + "watt_lifetime", whLifetime.toString());
       await this.publish(prefix + "last_read", lastReadDate.toISOString());
+      await this.publish(prefix + "last_read_epoch", readingTime.toString());
+
+      await this.publish(prefix + "last_read_epoch", readingTime.toString());
       await this.publish(prefix + "last_read_epoch", readingTime.toString());
     } catch (e) {
       console.error(e);

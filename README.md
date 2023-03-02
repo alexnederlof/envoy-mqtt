@@ -4,6 +4,9 @@ This is a simple application that polls your local envoy
 gateway every minute for it's production values. Storage
 has not been implemented.
 
+⚠️ WIP, this code doesn't quite work yet due to trouble with
+the authentication ⚠️.
+
 ## Authenticating
 
 To get a token:
