@@ -6,7 +6,9 @@ export interface AppConfig {
   };
   readonly envoy: {
     host: string;
-    token: string;
+    clientId: string;
+    clientSecret: string;
+    redirectUrl: string;
   };
 }
 
@@ -18,8 +20,10 @@ export function parse(): AppConfig {
       password: process.env["MQTT_PASSWORD"]?.trim(),
     },
     envoy: {
+      clientId: getOrError("ENVOY_CLIENT_ID"),
+      clientSecret: getOrError("ENVOY_CLIENT_SECRET"),
+      redirectUrl: getOrError("ENVOY_REDIRECT_URL"),
       host: getOrError("ENVOY_HOST"),
-      token: getOrError("ENVOY_TOKEN"),
     },
   };
 }

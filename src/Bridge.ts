@@ -27,18 +27,18 @@ export class Bridge {
     this.api = axios.create({
       baseURL: config.envoy.host,
       headers: {
-        Authorization: `Bearer ${config.envoy.token}`,
+        Authorization: `Bearer xx`,
       },
       httpsAgent: new https.Agent({
         rejectUnauthorized: false,
       }),
     });
 
-    const parsedTokenBody = JSON.parse(
-      Buffer.from(config.envoy.token.split(".")[1], "base64").toString()
-    );
-    const expire = new Date(parsedTokenBody.exp * 1000);
-    console.log("Token will expire at ", expire);
+    // const parsedTokenBody = JSON.parse(
+    //   Buffer.from(config.envoy.token.split(".")[1], "base64").toString()
+    // );
+    // const expire = new Date(parsedTokenBody.exp * 1000);
+    // console.log("Token will expire at ", expire);
   }
 
   public async start() {
