@@ -112,7 +112,7 @@ export class Bridge {
           (this.lastReadTimePerInverter[serialNumber] || 0) < lastReportDate
         ) {
           this.lastReadTimePerInverter[serialNumber] = lastReportDate;
-          const prefix = `${this.mqttPrefix}/inverter/${serialNumber}/`;
+          const prefix = `${this.mqttPrefix}inverter/${serialNumber}/`;
           const lastReadDate = new Date(lastReportDate * 1000);
           await this.publish(prefix + "last_watts", lastReportWatts.toString());
           await this.publish(prefix + "max_watts", maxReportWatts.toString());
