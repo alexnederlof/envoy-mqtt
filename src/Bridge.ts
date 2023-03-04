@@ -1,8 +1,6 @@
-import axios, { AxiosInstance } from "axios";
-import { config } from "dotenv";
-import * as https from "https";
 import { Client as MqttClient } from "mqtt";
 import { AppConfig } from "./Config";
+import { EnphaseApi } from "./EnphaseApi";
 
 export interface EnvoyResponse {
   production: Production[];
@@ -17,28 +15,21 @@ export interface Production {
 }
 
 export class Bridge {
-  private readonly api: AxiosInstance;
+  public readonly api: EnphaseApi;
   public hasError = false;
   private lastReadingTime = 0;
+  private lastReadTimePerInverter: { [key: string]: number } = {};
+  public lastMqttDispatch: Date | null = null;
   private toClear: NodeJS.Timer | null = null;
+  private readonly mqttPrefix: string;
 
   constructor(config: AppConfig, private mqtt: MqttClient) {
-    console.log(`Connecting to ${config.envoy.host}`);
-    this.api = axios.create({
-      baseURL: config.envoy.host,
-      headers: {
-        Authorization: `Bearer xx`,
-      },
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: false,
-      }),
-    });
-
-    // const parsedTokenBody = JSON.parse(
-    //   Buffer.from(config.envoy.token.split(".")[1], "base64").toString()
-    // );
-    // const expire = new Date(parsedTokenBody.exp * 1000);
-    // console.log("Token will expire at ", expire);
+    this.api = new EnphaseApi(config.envoy);
+    let prefix = process.env["MQTT_TOPIC_PREFIX"] || "envoy/";
+    if (!prefix.endsWith("/")) {
+      prefix += "/";
+    }
+    this.mqttPrefix = prefix;
   }
 
   public async start() {
@@ -68,30 +59,72 @@ export class Bridge {
 
   async getLatest() {
     try {
-      const { data } = await this.api.get<EnvoyResponse>(
-        "/production.json?details=1"
-      );
-      let { activeCount, readingTime, wNow, whLifetime } = data.production[0];
-      const lastReadDate = new Date(readingTime * 1000);
-      if (this.lastReadingTime === readingTime) {
-        console.log("No update from envoy");
-        return;
-      } else {
-        console.log(
-          `Updating with last reading now=${wNow} lifetime=${whLifetime} from ${lastReadDate}`
-        );
-      }
-      const prefix = "envoy/garage/";
-      await this.publish(prefix + "active_count", activeCount.toString());
-      await this.publish(prefix + "watt_now", wNow.toString());
-      await this.publish(prefix + "watt_lifetime", whLifetime.toString());
-      await this.publish(prefix + "last_read", lastReadDate.toISOString());
-      await this.publish(prefix + "last_read_epoch", readingTime.toString());
-
-      await this.publish(prefix + "last_read_epoch", readingTime.toString());
-      await this.publish(prefix + "last_read_epoch", readingTime.toString());
+      await this.sendProdData();
+      await this.sendPerInverterData();
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  async sendProdData() {
+    const data = await this.api.getProductionData();
+    let { activeCount, readingTime, wNow, whLifetime } = data.production[0];
+    const lastReadDate = new Date(readingTime * 1000);
+    if (this.lastReadingTime === readingTime) {
+      console.log("No update from envoy");
+    } else {
+      this.lastReadingTime = readingTime;
+      console.log(
+        `Updating with last reading now=${wNow} lifetime=${whLifetime} from ${lastReadDate}`
+      );
+    }
+    await this.publish(
+      this.mqttPrefix + "active_count",
+      activeCount.toString()
+    );
+    await this.publish(this.mqttPrefix + "watt_now", wNow.toString());
+    await this.publish(
+      this.mqttPrefix + "watt_lifetime",
+      whLifetime.toString()
+    );
+    await this.publish(
+      this.mqttPrefix + "last_read",
+      lastReadDate.toISOString()
+    );
+    await this.publish(
+      this.mqttPrefix + "last_read_epoch",
+      readingTime.toString()
+    );
+    this.lastMqttDispatch = new Date();
+  }
+
+  async sendPerInverterData() {
+    const perInverter = await this.api.getInverters();
+    for (const inverter of perInverter) {
+      try {
+        const {
+          serialNumber,
+          lastReportDate,
+          lastReportWatts,
+          maxReportWatts,
+        } = inverter;
+        if (
+          (this.lastReadTimePerInverter[serialNumber] || 0) < lastReportDate
+        ) {
+          this.lastReadTimePerInverter[serialNumber] = lastReportDate;
+          const prefix = `${this.mqttPrefix}/inverter/${serialNumber}/`;
+          const lastReadDate = new Date(lastReportDate * 1000);
+          await this.publish(prefix + "last_watts", lastReportWatts.toString());
+          await this.publish(prefix + "max_watts", maxReportWatts.toString());
+          await this.publish(prefix + "last_read", lastReadDate.toISOString());
+          await this.publish(
+            prefix + "last_read_epoch",
+            lastReportDate.toString()
+          );
+        }
+      } catch (error) {
+        console.error("Could not update one inverter", error);
+      }
     }
   }
 }

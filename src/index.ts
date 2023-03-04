@@ -2,14 +2,14 @@ import { config as loadEnv } from "dotenv";
 import { Client as MqttClient, connect as newMqttClient } from "mqtt";
 import { Bridge } from "./Bridge";
 import { AppConfig, parse } from "./Config";
-import { AuthServer } from "./server";
+import { HttpServer } from "./server";
 
 async function main() {
   await loadEnv();
   const config = parse();
   const mqtt = await connectToMqtt(config);
   const bridge = new Bridge(config, mqtt);
-  const server = new AuthServer(config);
+  const server = new HttpServer(bridge);
 
   function stop() {
     bridge.stop();
@@ -19,7 +19,10 @@ async function main() {
   process.on("SIGTERM", stop);
   process.on("SIGINT", stop);
   server.start();
-  // bridge.start();
+  bridge.start().catch((e) => {
+    console.error("Bridge error", e);
+    stop();
+  });
 }
 
 async function connectToMqtt(config: AppConfig) {

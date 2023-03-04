@@ -1,8 +1,6 @@
-import axios from "axios";
 import http from "http";
-import { EnvoyResponse } from "./Bridge";
+import { Bridge } from "./Bridge";
 import { AppConfig } from "./Config";
-import { welcomePage } from "./WelcomPage";
 
 export interface EnphaseTokenResponse {
   access_token: string;
@@ -18,7 +16,7 @@ export interface EnphaseTokenResponse {
   jti: string;
 }
 
-export class AuthServer {
+export class HttpServer {
   private hostname = process.env["HTTP_LISTEN_ADDRESS"] || "0.0.0.0";
   private port = Number(process.env["HTTP_LISTEN_PORT"] || 3000);
   private server: http.Server<
@@ -26,30 +24,37 @@ export class AuthServer {
     typeof http.ServerResponse
   >;
 
-  constructor(config: AppConfig) {
+  constructor(bridge: Bridge) {
     this.server = http.createServer(async (req, res) => {
       try {
         const uri = new URL(req.url!, `http://${req.headers.host}`);
         switch (uri.pathname) {
           case "/":
             res.statusCode = 200;
-            res.setHeader("Content-Type", "text/html");
-            res.end(welcomePage(config.envoy));
+            res.setHeader("Content-Type", "text/plain");
+            res.end("This is the Envoy MQTT exporter");
             break;
-          case "/auth-callback":
-            const code = uri.searchParams.get("code");
-            if (!code) {
-              throw new Error("Code not provided");
-            }
-            const token = await getToken(code, config.envoy);
+          case "/inspect":
+            const [prod, inverters] = await Promise.all([
+              bridge.api.getProductionData(),
+              bridge.api.getInverters(),
+            ]);
             res.statusCode = 200;
             res.setHeader("Content-Type", "application/json");
-            res.end(JSON.stringify(token));
+            res.end(JSON.stringify({ prod, inverters }));
             break;
           case "/_health":
-            res.statusCode = 200;
+            if (
+              bridge.lastMqttDispatch &&
+              bridge.lastMqttDispatch >
+                new Date(new Date().getTime() - 5 * 60_000)
+            ) {
+              res.statusCode = 200;
+            } else {
+              res.statusCode = 500;
+            }
             res.setHeader("Content-Type", "text/plain");
-            res.end("IMOK");
+            res.end("Last dispatch " + bridge.lastMqttDispatch);
             break;
           default:
             res.statusCode = 404;
@@ -74,28 +79,4 @@ export class AuthServer {
   public stop() {
     this.server.close();
   }
-}
-
-async function getToken(code: string, config: AppConfig["envoy"]) {
-  const { data } = await axios.post<EnvoyResponse>(
-    "https://api.enphaseenergy.com/oauth/token",
-    "",
-    {
-      params: {
-        grant_type: "authorization_code",
-        redirect_uri: config.redirectUrl,
-        code,
-      },
-      headers: {
-        Authorization: `Basic ${base64(
-          `${config.clientId}:${config.clientSecret}`
-        )}`,
-      },
-    }
-  );
-  return data;
-}
-
-function base64(content: string) {
-  return Buffer.from(content).toString("base64");
 }
