@@ -12,6 +12,12 @@ a token locally that you can use. I turns out that doesn't work
 (at the time of writing) and you need to create a session cookie
 instead. This code fixes that for you.
 
+Once the app is running you can access
+
+- `/` to see just a hello message
+- `/_health` to get a `200` if it successfully emitted to MQTT in the last 5 minutes
+- `/inspect` to see what data it's getting from envoy
+
 ## Configuration
 
 The following items need to be configured.
@@ -26,5 +32,7 @@ The following items need to be configured.
 | ENVOY_USERNAME       | The token you got as described above                                                                          | required                         |
 | ENVOY_PASSWORD       | The token you got as described above                                                                          | required                         |
 | ENVOY_GATEWAY_SERIAL | The token you got as described above                                                                          | required                         |
+| HTTP_LISTEN_ADDRESS  | To what IP or hostname to bind the HTTP server.                                                               | Default is `0.0.0.0`             |
+| HTTP_LISTEN_PORT     | What port to run the server on.                                                                               | Default is `3000`                |
 
 On startup a `.env` file is also read in case you want to configure by file.
