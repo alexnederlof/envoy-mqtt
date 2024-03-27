@@ -11,7 +11,7 @@
     "mustache": "^4.2.0"
   },
   "devDependencies": {
-    "@tsconfig/node18": "^18.2.0",
+    "@tsconfig/node18": "^18.2.4",
     "@types/express": "^4.17.21",
     "@types/node": "^20.4.4",
     "husky": "^8.0.3",
