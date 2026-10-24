@@ -1,5 +1,10 @@
 # Envoy to MQTT
 
+**Deprecated for the home deployment as of 2026-10-24.** Solar ingestion now
+uses Home Assistant's built-in Enphase Envoy integration, including the Energy
+dashboard and production cards. The custom bridge is undeployed; its source
+is retained for reference. Existing HA statistics were preserved.
+
 This is a simple application that polls your local envoy
 gateway every minute for it's production values. Storage
 has not been implemented.
